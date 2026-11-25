@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>过街秒表</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #eceff1; color: #1f2529; line-height: 1.6; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 20px 14px 40px; }
+  h1 { font-size: 26px; letter-spacing: 1px; }
+  .lead { color: #4f5a61; font-size: 14px; margin: 4px 0 14px; }
+  .card { background: #fff; border-radius: 10px; padding: 14px; border: 1px solid #d3d9dd; margin-bottom: 14px; min-width: 0; }
+  .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 8px; overflow-wrap: anywhere; }
+  label { font-size: 12px; color: #4f5a61; display: block; overflow-wrap: anywhere; }
+  input, textarea { font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid #b4bec4; border-radius: 6px; width: 100%; min-width: 0; background: #fff; font-variant-numeric: tabular-nums; }
+  textarea { resize: vertical; min-height: 112px; }
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 12px; }
+  .g4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .g4 > div { min-width: 0; }
+  .grp { font-size: 13px; font-weight: 600; color: #2d5d7b; margin: 10px 0 4px; }
+  .grp:first-child { margin-top: 0; }
+  .bad { border-color: #b3412f !important; background: #fff0ec !important; }
+  button { font: inherit; font-size: 13px; padding: 6px 11px; border-radius: 6px; border: 1px solid #234e68; background: #234e68; color: #fff; cursor: pointer; }
+  button.ghost { background: #fff; color: #234e68; }
+  .presets, .dl { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .err { display: none; background: #fff0ec; border: 1px solid #ecb7aa; color: #8e2b1c; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; overflow-wrap: anywhere; }
+  .muted { color: #74808a; font-size: 12px; }
+  .verdict { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+  .stamp { display: inline-block; border: 3px solid #b3412f; color: #b3412f; border-radius: 8px; padding: 2px 10px; font-weight: 800; font-size: 18px; transform: rotate(-3deg); white-space: nowrap; }
+  .stamp.ok { border-color: #2f7a4f; color: #2f7a4f; } .stamp.rush { border-color: #b07a12; color: #b07a12; } .stamp.late { border-color: #c4561d; color: #c4561d; }
+  #need { font-size: 15px; color: #4f5a61; overflow-wrap: anywhere; }
+  #need b { font-size: 22px; color: #1f2529; font-variant-numeric: tabular-nums; }
+  #sumTxt { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+  #facts { margin: 10px 0 0 18px; font-size: 13px; color: #4f5a61; } #facts li { margin: 2px 0; overflow-wrap: anywhere; }
+  #road { width: 100%; height: auto; display: block; border-radius: 6px; }
+  .scrub { display: flex; gap: 10px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .scrub input[type=range] { flex: 1 1 220px; padding: 0; border: 0; }
+  #tNow { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+  .who { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .who th, .who td { padding: 5px 6px; border-bottom: 1px solid #e3e7ea; text-align: right; }
+  .who th { color: #4f5a61; font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .who td:first-child, .who th:first-child { text-align: left; overflow-wrap: anywhere; word-break: break-all; }
+  .tag { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 12px; white-space: nowrap; }
+  .tag.green { background: #e2f3e8; color: #2f7a4f; } .tag.flash { background: #fbf0d6; color: #8a5f0c; } .tag.clear { background: #fde6d8; color: #a44516; } .tag.stuck { background: #fbe1dc; color: #9b2c1c; }
+  .tw { overflow-x: auto; }
+  #sugs { display: grid; gap: 8px; }
+  .sug { display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid #d3d9dd; border-radius: 6px; padding: 8px 10px; }
+  .sug span { min-width: 0; overflow-wrap: anywhere; font-size: 14px; } .sug button { flex: none; }
+  .how { font-size: 13px; } .how p { margin: 6px 0; }
+  @media (max-width: 760px) { .top { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 520px) { .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sug { flex-direction: column; align-items: stretch; } #sumTxt { font-size: 15px; } .who th, .who td { padding: 4px 3px; font-size: 12px; } .hide-s { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>过街秒表</h1>
+  <p class="lead">一条宽马路，人行绿灯只有十几秒。写下一起过马路的人和各自的步速，再填路宽和灯的秒数，这里按秒推一遍：红灯亮的那一刻每个人走到了哪、还差几米、站在第几条车道；最慢的那位要多长的绿灯才够，最晚绿灯亮后第几秒到路口还来得及。默认例子是虚构的。</p>
+
+  <div class="card">
+    <div class="top">
+      <div>
+        <div class="grp">谁一起过（每行「名字 步速」，米/秒）</div>
+        <textarea id="people" maxlength="400" spellcheck="false"></textarea>
+        <p class="muted">不知道步速：数一下走 10 米要几秒，10 ÷ 秒数就是。最多 12 人。</p>
+      </div>
+      <div>
+        <div class="grp">路</div>
+        <div class="g4">
+          <div><label for="width">路宽（米）</label><input id="width" inputmode="decimal" maxlength="6"></div>
+          <div><label for="lanes">车道数</label><input id="lanes" inputmode="numeric" maxlength="2"></div>
+          <div><label for="island">安全岛（米，无填 0）</label><input id="island" inputmode="decimal" maxlength="6"></div>
+          <div><label for="react">看到绿灯到迈步（秒）</label><input id="react" inputmode="decimal" maxlength="4"></div>
+        </div>
+        <div class="grp">灯</div>
+        <div class="g4">
+          <div><label for="green">人行绿灯（秒）</label><input id="green" inputmode="decimal" maxlength="5"></div>
+          <div><label for="flash">绿闪（秒，没有填 0）</label><input id="flash" inputmode="decimal" maxlength="4"></div>
+          <div><label for="clear">红灯后几秒车才放行</label><input id="clear" inputmode="decimal" maxlength="4"></div>
+          <div><label for="arrived">到路口时绿灯已亮（秒）</label><input id="arrived" inputmode="decimal" maxlength="5"></div>
+        </div>
+      </div>
+    </div>
+    <div class="presets" id="presets"><button id="reset" class="ghost">恢复默认</button></div>
+  </div>
+
+  <div class="err" id="error"></div>
+
+  <div id="out">
+    <div class="card">
+      <div class="verdict"><span class="stamp" id="stamp"></span><span id="need"></span></div>
+      <div id="sumTxt"></div>
+      <ul id="facts"></ul>
+    </div>
+
+    <div class="card">
+      <h2>路面快照</h2>
+      <canvas id="road" width="960" height="320"></canvas>
+      <div class="scrub"><input type="range" id="t" min="0" max="100" step="0.5" aria-label="拖动看第几秒"><span id="tNow"></span></div>
+      <div class="presets" id="jump"></div>
+      <p class="muted">从左往右过马路。灰色虚线是车道线，中间黄条是安全岛。拖动滑块看任意一秒每个人在哪，默认停在人行红灯亮的那一刻。</p>
+    </div>
+
+    <div class="card">
+      <h2>每个人</h2>
+      <div class="tw"><table class="who" id="who"></table></div>
+    </div>
+
+    <div class="card" id="sugCard">
+      <h2>改一样试试（点一下代回重算）</h2>
+      <div id="sugs"></div>
+    </div>
+
+    <div class="card">
+      <h2>带走</h2>
+      <div class="dl">
+        <button id="dlPNG">结果卡 PNG</button><button id="dlCSV" class="ghost">CSV</button><button id="dlMD" class="ghost">Markdown</button><button id="dlJSON" class="ghost">JSON 备份</button>
+      </div>
+      <p class="muted" style="margin-top:6px">输入自动存在这台设备的浏览器里，不上传。</p>
+    </div>
+  </div>
+
+  <div class="card how">
+    <h2>怎么算的</h2>
+    <p>秒数都从你到路口那一刻算。看到绿灯后先等「迈步」那几秒，之后按你填的步速匀速直线走，走满路宽为止。走完要的时间 = 迈步 + 路宽 ÷ 步速。</p>
+    <p>和三个时刻比：绿灯结束（绿灯 − 已亮）、人行红灯亮（再加绿闪）、车辆放行（再加清空秒数）。在哪一段走完，就是哪一档。红灯那一刻走了的米数除以每条车道宽（路宽 ÷ 车道数），就是站在第几条车道。</p>
+    <p>反推：绿灯一亮就走、在红灯前走完，绿灯至少 = 迈步 + 路宽 ÷ 最慢步速 − 绿闪，往上取整秒；最晚绿灯亮后第几秒到 = 绿灯 + 绿闪 − 迈步 − 路宽 ÷ 步速，往下取 0.1 秒。</p>
+    <p>边界：步速、反应时间是你填的，按匀速估算，没算人多拥挤、车辆让行和中途加快；不对应任何真实路口的配时标准，也不判断事故责任。车放行时还在路上，最稳的是在安全岛或路边等下一轮。</p>
+  </div>
+</div>
+
+  <script>
+/* 过街秒表 · 计算核心
+ * 场景：一条宽马路，人行绿灯只有十几秒。家里老人、带孩子的、拄拐的，按各自的步速，绿灯一亮就走，
+ *       红灯亮的那一刻每个人走到了哪儿、还剩几米、在第几条车道上？要多长的绿灯才够最慢的人走完？
+ * 模型（设计选择，不是定论，也不对应任何一条真实道路的配时）：
+ *   · 灯：人行绿灯 G 秒 → 绿闪 F 秒 → 人行红灯；红灯亮后再过「清空」C 秒，横向车辆才放行。
+ *   · 到路口时绿灯已经亮了 a 秒（0 = 刚变绿）。看到灯后要 rx 秒才迈步（反应 + 起步）。
+ *   · 每个人匀速 v（米/秒）直线走完路宽 W 米。t 秒时走了 x(t) = v × max(0, t − rx)，最多 W。
+ *     （t 从到路口那一刻算起）
+ *   · 走完要 need = rx + W / v 秒。和三个时刻比：绿灯结束 G − a、绿闪结束 G + F − a、车辆放行 G + F + C − a。
+ *   · 车道：路宽平均分给 n 条车道，从起步这一侧数第几条。
+ *   · 中间安全岛（可选，位置 I 米）：走不完全程但在绿闪结束前能走到岛上的人，建议在岛上等下一轮。
+ * 不做：车辆速度与让行、人群拥挤、斜穿、步速随时间变化、真实道路配时标准、法律责任判断。 */
+(function (root) {
+  'use strict';
+  function Bad(message, field) { const e = new Error(message); e.field = field; return e; }
+  const KEYS = ['width', 'lanes', 'green', 'flash', 'clear', 'react', 'arrived', 'island', 'people'];
+  const MAX_PEOPLE = 12, MAX_NAME = 16;
+  const EPS = 1e-9;
+
+  function fmt(x, d) { if (x == null || !isFinite(x)) return '—'; const s = (Math.round(x * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d); return d > 0 ? s.replace(/\.?0+$/, '') : s; }
+  const sec = (x) => fmt(x, 1) + ' 秒';
+  const m = (x) => fmt(x, 1) + ' 米';
+  const mps = (x) => fmt(x, 2) + ' 米/秒';
+
+  function num(v, name, field, lo, hi, int) {
+    const t = String(v == null ? '' : v).trim().replace(/[,，\s]/g, '');
+    if (!/^-?\d+(\.\d+)?$/.test(t)) throw Bad(name + '要写数字', field);
+    const x = +t;
+    if (int && !Number.isInteger(x)) throw Bad(name + '要写整数', field);
+    if (x < lo || x > hi) throw Bad(name + '在 ' + lo + ' 到 ' + hi + ' 之间', field);
+    return x;
+  }
+
+  /* 每行「名字 步速」，步速是米/秒；也接受「名字 1.2m/s」「名字，1.2」 */
+  function parsePeople(text) {
+    const lines = String(text == null ? '' : text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) throw Bad('至少写一个人：每行「名字 步速」，比如「奶奶 0.8」', 'people');
+    if (lines.length > MAX_PEOPLE) throw Bad('最多 ' + MAX_PEOPLE + ' 个人（现在 ' + lines.length + ' 行）', 'people');
+    const seen = {};
+    return lines.map((l, i) => {
+      const mt = l.match(/^(.*?)[\s,，:：]+(-?\d+(?:\.\d+)?)\s*(m\/s|米\/秒|米每秒)?$/i);
+      if (!mt || !mt[1].trim()) throw Bad('第 ' + (i + 1) + ' 行要写成「名字 步速」，比如「奶奶 0.8」', 'people');
+      const name = mt[1].trim();
+      if (name.length > MAX_NAME) throw Bad('第 ' + (i + 1) + ' 行名字最多 ' + MAX_NAME + ' 个字', 'people');
+      if (seen[name]) throw Bad('第 ' + (i + 1) + ' 行的「' + name + '」重名了', 'people');
+      seen[name] = 1;
+      const v = +mt[2];
+      if (!(v >= 0.2 && v <= 3)) throw Bad('第 ' + (i + 1) + ' 行步速在 0.2 到 3 米/秒之间', 'people');
+      return { name, v };
+    });
+  }
+
+  function parse(inp) {
+    const o = inp || {};
+    const D = {
+      width: num(o.width, '路宽（米）', 'width', 3, 120),
+      lanes: num(o.lanes, '车道数', 'lanes', 1, 16, true),
+      green: num(o.green, '绿灯（秒）', 'green', 1, 180),
+      flash: num(o.flash, '绿闪（秒）', 'flash', 0, 30),
+      clear: num(o.clear, '红灯后车辆放行前（秒）', 'clear', 0, 30),
+      react: num(o.react, '看到绿灯到迈步（秒）', 'react', 0, 10),
+      arrived: num(o.arrived, '到路口时绿灯已亮（秒）', 'arrived', 0, 210),
+      island: num(o.island, '中间安全岛位置（米，没有填 0）', 'island', 0, 120),
+      people: parsePeople(o.people),
+    };
+    if (D.arrived >= D.green + D.flash) throw Bad('到路口时绿灯已亮的秒数要小于绿灯 + 绿闪（' + fmt(D.green + D.flash, 1) + ' 秒），否则已经是红灯了', 'arrived');
+    if (D.island > 0 && D.island >= D.width) throw Bad('安全岛位置要在路中间（小于路宽 ' + fmt(D.width, 1) + ' 米）；没有就填 0', 'island');
+    return D;
+  }
+
+  /* t 秒（从到路口算）时走了多远 */
+  function posAt(v, rx, W, t) { return Math.min(W, v * Math.max(0, t - rx)); }
+  function laneOf(x, D) { const lw = D.width / D.lanes; return Math.min(D.lanes, Math.floor(x / lw + EPS) + 1); }
+
+  const LEVEL = {
+    green: { k: 0, label: '绿灯里走完' },
+    flash: { k: 1, label: '绿闪里赶完' },
+    clear: { k: 2, label: '红灯后才到，车还没放行' },
+    stuck: { k: 3, label: '车放行时还在路上' },
+  };
+
+  function person(p, D) {
+    const tG = D.green - D.arrived, tF = D.green + D.flash - D.arrived, tC = tF + D.clear;
+    const need = D.react + D.width / p.v;
+    const lv = need <= tG + EPS ? 'green' : need <= tF + EPS ? 'flash' : need <= tC + EPS ? 'clear' : 'stuck';
+    const xRed = posAt(p.v, D.react, D.width, tF), xGo = posAt(p.v, D.react, D.width, tC);
+    const left = D.width - xRed;
+    const latest = D.green + D.flash - D.react - D.width / p.v; /* 绿灯亮后最晚第几秒到路口还能在绿闪结束前走完 */
+    let isl = null;
+    if (D.island > 0 && lv !== 'green' && lv !== 'flash') {
+      const tI = D.react + D.island / p.v;
+      isl = { reach: tI <= tF + EPS, t: tI };
+    }
+    return { name: p.name, v: p.v, need, level: lv, xRed, left, laneRed: left > EPS ? laneOf(xRed, D) : null, xGo, leftGo: D.width - xGo,
+      laneGo: D.width - xGo > EPS ? laneOf(xGo, D) : null, late: need - tF, latest, island: isl };
+  }
+
+  /* 展示用：往下取到 0.1 秒，保证「按这个秒数到」一定来得及 */
+  function latestShown(p) { return Math.floor(p.latest * 10 + 1e-6) / 10; }
+  /* 想在绿闪结束前走完，至少要多快 */
+  function minSpeed(D) { const t = D.green + D.flash - D.arrived - D.react; return t > EPS ? D.width / t : Infinity; }
+  /* 让某人刚好在绿闪结束前走完（a=0、绿闪不变），绿灯至少要几秒（取整到 1 秒往上） */
+  function greenNeeded(D, v) { return Math.max(1, Math.ceil(D.react + D.width / v - D.flash - 1e-9)); }
+
+  function calculate(inp) {
+    const D = parse(inp);
+    const P = D.people.map((p) => person(p, D));
+    const worst = P.reduce((a, b) => (LEVEL[b.level].k > LEVEL[a.level].k || (LEVEL[b.level].k === LEVEL[a.level].k && b.need > a.need) ? b : a));
+    const slow = P.reduce((a, b) => (b.v < a.v ? b : a));
+    const vmin = minSpeed(D);
+    const gNeed = greenNeeded(D, slow.v);
+    const nOK = P.filter((p) => p.level === 'green' || p.level === 'flash').length;
+    const nStuck = P.filter((p) => p.level === 'stuck').length;
+    let verdict, stamp;
+    if (P.every((p) => p.level === 'green')) { verdict = 'ok'; stamp = '都走得完'; }
+    else if (nOK === P.length) { verdict = 'rush'; stamp = '要赶'; }
+    else if (nStuck) { verdict = 'stuck'; stamp = '会困在路中间'; }
+    else { verdict = 'late'; stamp = '红灯了还在走'; }
+    const tF = D.green + D.flash - D.arrived;
+    let summary;
+    if (verdict === 'ok') summary = '绿灯' + (D.arrived ? '亮了 ' + fmt(D.arrived, 1) + ' 秒才到，' : '一亮就走，') + P.length + ' 个人都能在绿灯里走完 ' + m(D.width) + '，最慢的' + worst.name + '还剩 ' + sec(D.green - D.arrived - worst.need) + '。';
+    else if (verdict === 'rush') summary = '都能走完，但' + P.filter((p) => p.level === 'flash').map((p) => p.name).join('、') + '要到绿闪里才走到对面；最晚的' + worst.name + '离红灯只差 ' + sec(tF - worst.need) + '。';
+    else summary = '红灯亮时' + worst.name + '才走了 ' + m(worst.xRed) + '，还差 ' + m(worst.left) + (worst.laneRed ? '，在第 ' + worst.laneRed + ' 条车道上' : '') + '；' + (nOK === 0 ? P.length + ' 个人都走不完。' : P.length + ' 个人里 ' + (P.length - nOK) + ' 个走不完。');
+    const facts = [];
+    facts.push('路宽 ' + m(D.width) + '，从到路口算 ' + sec(tF) + '后转人行红灯' + (D.clear ? '、再过 ' + sec(D.clear) + '车辆放行' : '，红灯一亮车就放行') + '；扣掉迈步的 ' + sec(D.react) + '，要每秒走 ' + (isFinite(vmin) ? fmt(vmin, 2) + ' 米' : '无穷快') + '才走得完。');
+    if (gNeed > 180) facts.push('最慢的' + slow.name + '（' + mps(slow.v) + '）要 ' + gNeed + ' 秒以上的绿灯才走得完，超过一般路口的配时，这种路最好分两段过或绕行。');
+    else facts.push('要让最慢的' + slow.name + '（' + mps(slow.v) + '）绿灯一亮就走、' + (D.flash ? '绿闪结束前' : '红灯亮前') + '到对面，绿灯至少 ' + gNeed + ' 秒' + (D.flash ? '（另有 ' + sec(D.flash) + '绿闪）' : '') + '，现在是 ' + fmt(D.green, 1) + ' 秒。');
+    const stuckOnes = P.filter((p) => p.level === 'stuck');
+    if (stuckOnes.length) { const s = stuckOnes.reduce((a, b) => (b.leftGo > a.leftGo ? b : a)); facts.push('车辆放行时' + s.name + '还在第 ' + s.laneGo + ' 条车道，离对面 ' + m(s.leftGo) + '。'); }
+    if (D.island > 0) {
+      const can = P.filter((p) => p.island && p.island.reach).map((p) => p.name), cannot = P.filter((p) => p.island && !p.island.reach).map((p) => p.name);
+      if (can.length || cannot.length) facts.push('安全岛在 ' + m(D.island) + '：' + (can.length ? can.join('、') + '能在红灯前走到岛上等下一轮' : '') + (can.length && cannot.length ? '；' : '') + (cannot.length ? cannot.join('、') + '连岛都走不到' : '') + '。');
+    }
+    const ok2 = P.filter((p) => p.latest >= 0), no2 = P.filter((p) => p.latest < 0);
+    if (ok2.length) facts.push('绿灯亮后最晚第几秒到路口还来得及：' + ok2.map((p) => p.name + ' ' + sec(latestShown(p))).join('，') + (no2.length ? '；' + no2.map((p) => p.name).join('、') + '刚变绿就走也不够' : '') + '。');
+    return { D, P, worst, slow, vmin, gNeed, verdict, stamp, summary, facts, tG: D.green - D.arrived, tF, tC: tF + D.clear };
+  }
+
+  function sameInput(o) { const s = {}; KEYS.forEach((k) => { s[k] = String(o[k]); }); return s; }
+  /* 建议：每条只改一个输入，代回后重算；文字里的数字来自代回后的同一次计算 */
+  function suggestions(inp, R) {
+    const D = R.D, out = [];
+    const add = (id, patch, mk) => {
+      const a = Object.assign(sameInput(inp), patch);
+      let R2; try { R2 = calculate(a); } catch (e) { return; }
+      out.push({ id, apply: a, text: mk(R2), verdict: R2.verdict });
+    };
+    if (R.verdict === 'ok') return out;
+    if (D.arrived > 0) add('wait', { arrived: '0' }, (R2) => '等下一轮绿灯一亮就走：' + R2.stamp + '，' + R2.worst.name + (R2.worst.left > EPS ? '红灯时还差 ' + m(R2.worst.left) : '能走完') + '。');
+    if (D.react > 0.5) add('react', { react: '0.5' }, (R2) => '提前站到路沿、绿灯一亮马上迈步（迈步 0.5 秒）：' + R2.stamp + '，' + R2.worst.name + (R2.worst.left > EPS ? '红灯时还差 ' + m(R2.worst.left) : '能走完') + '。');
+    if (!(D.island > 0) && D.width >= 12 && R.P.some((p) => p.level !== 'green' && p.level !== 'flash' && D.react + D.width / 2 / p.v <= R.tF + EPS)) add('island', { island: fmt(D.width / 2, 1) }, (R2) => '路中间要是有安全岛（' + m(D.width / 2) + '处）：结论还是「' + R2.stamp + '」，但' + (R2.P.filter((p) => p.island && p.island.reach).map((p) => p.name).join('、') || '没人') + '能先走到岛上等，' + (R2.P.filter((p) => p.island && !p.island.reach).length ? R2.P.filter((p) => p.island && !p.island.reach).map((p) => p.name).join('、') + '连岛都到不了' : '其余人走得完') + '。');
+    if (R.gNeed > D.green) add('green', { green: String(R.gNeed), arrived: '0' }, (R2) => '要是绿灯有 ' + R.gNeed + ' 秒' + (D.arrived ? '、而且一亮就走' : '') + '：' + R2.stamp + '，' + R2.worst.name + '离红灯还剩 ' + sec(R2.tF - R2.worst.need) + '。');
+    return out;
+  }
+
+  function csvCell(v) { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function toCSV(R, when) {
+    const D = R.D, L = [];
+    L.push(['过街秒表', when].map(csvCell).join(','));
+    L.push(['路宽（米）', D.width, '车道数', D.lanes, '绿灯（秒）', D.green, '绿闪（秒）', D.flash, '清空（秒）', D.clear, '迈步（秒）', D.react, '到时已亮（秒）', D.arrived, '安全岛（米）', D.island].join(','));
+    L.push('');
+    L.push(['名字', '步速（米/秒）', '走完要（秒）', '结果', '红灯时走了（米）', '红灯时还差（米）', '红灯时在第几条车道', '车放行时还差（米）', '最晚绿灯亮后第几秒到还来得及'].join(','));
+    R.P.forEach((p) => L.push([p.name, p.v, fmt(p.need, 1), LEVEL[p.level].label, fmt(p.xRed, 1), fmt(p.left, 1), p.laneRed || '', fmt(p.leftGo, 1), p.latest >= 0 ? fmt(latestShown(p), 1) : '不够'].map(csvCell).join(',')));
+    L.push('');
+    L.push(['结论', R.summary].map(csvCell).join(','));
+    R.facts.forEach((f) => L.push(['', f].map(csvCell).join(',')));
+    return L.join('\n') + '\n';
+  }
+  function toMD(R, when, sg) {
+    const L = [];
+    L.push('# 过街秒表', '', '生成时间：' + when + '　盖章：**' + R.stamp + '**', '', '> ' + R.summary, '');
+    R.facts.forEach((f) => L.push('- ' + f));
+    L.push('', '## 每个人', '', '| 名字 | 步速 | 走完要 | 结果 | 红灯时还差 | 在第几条车道 |', '|---|---|---|---|---|---|');
+    R.P.forEach((p) => L.push('| ' + p.name.replace(/\|/g, '｜') + ' | ' + mps(p.v) + ' | ' + sec(p.need) + ' | ' + LEVEL[p.level].label + ' | ' + (p.left > EPS ? m(p.left) : '已到') + ' | ' + (p.laneRed || '—') + ' |'));
+    if (sg && sg.length) { L.push('', '## 改一样试试', ''); sg.forEach((s) => L.push('- ' + s.text)); }
+    L.push('', '按匀速直线估算，步速、反应时间都是你填的；不对应任何真实路口的配时，不判断责任。默认例子是虚构的。');
+    return L.join('\n') + '\n';
+  }
+
+  const DEF_PEOPLE = '快走的年轻人 1.6\n普通走路 1.2\n牵着孩子 0.9\n拄拐的奶奶 0.6';
+  const DEFAULT = { width: '34', lanes: '8', green: '12', flash: '0', clear: '3', react: '1.5', arrived: '0', island: '0', people: DEF_PEOPLE };
+  const PRESETS = [
+    ['默认：34 米、绿灯 12 秒', DEFAULT],
+    ['普通四车道', Object.assign({}, DEFAULT, { width: '15', lanes: '4', green: '20', flash: '5', clear: '3' })],
+    ['宽马路有安全岛', Object.assign({}, DEFAULT, { width: '40', lanes: '8', green: '25', flash: '5', island: '20' })],
+    ['绿灯亮了一会儿才到', Object.assign({}, DEFAULT, { width: '15', lanes: '4', green: '20', flash: '5', arrived: '12' })],
+  ];
+  const api = { DEFAULT, PRESETS, KEYS, LEVEL, MAX_PEOPLE, MAX_NAME, parse, parsePeople, calculate, person, posAt, laneOf, minSpeed, greenNeeded, latestShown, suggestions, toCSV, toMD, fmt, sec, m, mps };
+  if (typeof module === 'object' && module.exports) module.exports = api; else root.AppCore = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+  </script>
+  <script>
+/* 过街秒表 · 界面层 */
+(function () {
+  'use strict';
+  const C = window.AppCore;
+  const KEY = 'cross-in-time:v1';
+  const NAME = '过街秒表';
+  const copy = (o) => JSON.parse(JSON.stringify(o));
+  const DEFAULT = C.DEFAULT, PRESETS = C.PRESETS, KEYS = C.KEYS;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const FF = '"PingFang SC","Microsoft YaHei",sans-serif';
+  const COL = { green: '#2f7a4f', flash: '#b07a12', clear: '#c4561d', stuck: '#b3412f' };
+  let state = copy(DEFAULT);
+  let last = null;
+  let tView = null; /* 滑块停在第几秒；null = 跟着红灯时刻 */
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 隐私模式忽略 */ } }
+  function load() {
+    try {
+      const o = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+      const s = {};
+      for (const k of KEYS) { if (o[k] == null || typeof o[k] === 'object') return null; s[k] = String(o[k]).slice(0, k === 'people' ? 400 : 20); }
+      return s;
+    } catch (e) { return null; }
+  }
+  function fill() { KEYS.forEach((k) => { $(k).value = state[k]; }); }
+
+  function needText(R) {
+    if (R.verdict === 'ok') return '最慢的也还剩 <b>' + esc(C.sec(R.tG - R.worst.need)) + '</b>';
+    if (R.verdict === 'rush') return '最晚那位离红灯只差 <b>' + esc(C.sec(R.tF - R.worst.need)) + '</b>';
+    return '红灯时' + esc(R.worst.name) + '还差 <b>' + esc(C.m(R.worst.left)) + '</b>';
+  }
+  function needPlain(R) { return needText(R).replace(/<[^>]+>/g, ''); }
+
+  function phaseAt(R, t) { return t < R.tG - 1e-9 ? '绿灯' : t < R.tF - 1e-9 ? '绿闪' : t < R.tC - 1e-9 ? '人行红灯，车还没放行' : '车辆放行'; }
+  function tMax(R) { return Math.max(R.tC + 2, Math.min(R.worst.need + 2, R.tC * 3 + 10)); }
+
+  /* 路面俯视图：从左（起点）往右（对面），每人一条泳道；t 秒时每人一个点 */
+  function drawRoad(g, R, t, X, Y, W, H, fs) {
+    const D = R.D, P = R.P, n = P.length;
+    const padL = 8 * fs, padR = 8 * fs, top = 26 * fs, bot = 22 * fs;
+    const x0 = X + padL, w = W - padL - padR, y0 = Y + top, h = H - top - bot;
+    const px = (x) => x0 + w * x / D.width;
+    g.fillStyle = '#5f6b72'; g.fillRect(x0, y0, w, h);
+    /* 斑马线条纹 */
+    g.fillStyle = 'rgba(255,255,255,0.13)';
+    const sw = Math.max(6 * fs, w / 60);
+    for (let xx = x0; xx < x0 + w; xx += sw * 2) g.fillRect(xx, y0, Math.min(sw, x0 + w - xx), h);
+    /* 车道线 */
+    g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1.5 * fs; g.setLineDash([8 * fs, 6 * fs]);
+    for (let k = 1; k < D.lanes; k++) { const xx = px(D.width * k / D.lanes); g.beginPath(); g.moveTo(xx, y0); g.lineTo(xx, y0 + h); g.stroke(); }
+    g.setLineDash([]);
+    if (D.island > 0) { g.fillStyle = '#e6c34a'; g.fillRect(px(D.island) - 4 * fs, y0, 8 * fs, h); }
+    /* 车道编号 */
+    g.font = (11 * fs) + 'px ' + FF; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillStyle = '#4f5a61';
+    const lw = w / D.lanes, stepL = Math.max(1, Math.ceil((26 * fs) / lw));
+    const wS = g.measureText('起点').width, wE = g.measureText('对面').width;
+    for (let k = 0; k < D.lanes; k++) {
+      const cx = x0 + lw * (k + 0.5), tw = g.measureText(String(k + 1)).width / 2;
+      if (!(k % stepL === 0 || k === D.lanes - 1)) continue;
+      if (cx - tw < X + wS + 4 * fs || cx + tw > X + W - wE - 4 * fs) continue;
+      g.fillText(String(k + 1), cx, y0 - 4 * fs);
+    }
+    g.textAlign = 'left'; g.fillText('起点', X, y0 - 4 * fs); g.textAlign = 'right'; g.fillText('对面', X + W, y0 - 4 * fs);
+    g.textAlign = 'center'; g.textBaseline = 'top'; g.fillStyle = '#4f5a61';
+    g.fillText('0', px(0) + 6 * fs, y0 + h + 4 * fs); g.fillText(C.fmt(D.width, 1) + ' 米', px(D.width) - 18 * fs, y0 + h + 4 * fs);
+    /* 每人 */
+    const lane = h / n, r = Math.max(4 * fs, Math.min(9 * fs, lane * 0.32));
+    P.forEach((p, i) => {
+      const yy = y0 + lane * (i + 0.5);
+      const x = C.posAt(p.v, D.react, D.width, t), done = x >= D.width - 1e-9;
+      g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = Math.max(2, r * 0.5);
+      g.beginPath(); g.moveTo(px(0), yy); g.lineTo(px(x), yy); g.stroke();
+      g.fillStyle = COL[p.level]; g.strokeStyle = '#fff'; g.lineWidth = 2 * fs;
+      g.beginPath(); g.arc(px(x), yy, r, 0, Math.PI * 2); g.fill(); g.stroke();
+      const fsz = Math.max(10, Math.min(13 * fs, lane * 0.42));
+      g.font = fsz + 'px ' + FF; g.textBaseline = 'middle';
+      const full = p.name + (done ? ' 已到' : ' 差 ' + C.m(D.width - x));
+      const roomR = x0 + w - (px(x) + r + 6 * fs) - 4 * fs, roomL = px(x) - r - 6 * fs - x0 - 4 * fs;
+      const fw = g.measureText(full).width;
+      const right = fw <= roomR || (fw > roomL && roomR >= roomL);
+      const tail = done ? ' 已到' : ' 差 ' + C.m(D.width - x), room = Math.max(30, right ? roomR : roomL);
+      const lab = fw <= room ? full : fit(g, p.name, Math.max(14 * fs, room - g.measureText(tail).width)) + tail;
+      const lwid = g.measureText(lab).width;
+      const lx = right ? px(x) + r + 6 * fs : px(x) - r - 6 * fs - lwid;
+      g.fillStyle = 'rgba(38,46,51,0.82)'; g.fillRect(lx - 3 * fs, yy - fsz * 0.68, lwid + 6 * fs, fsz * 1.36);
+      g.textAlign = 'left'; g.fillStyle = '#fff';
+      g.fillText(lab, lx, yy);
+    });
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  }
+  function fit(g, t, w) { let s = String(t); if (g.measureText(s).width <= w) return s; while (s.length > 1 && g.measureText(s + '…').width > w) s = s.slice(0, -1); return s + '…'; }
+  function sizeCanvas(cv, hCss) {
+    const dpr = window.devicePixelRatio || 1, w = Math.max(260, cv.parentNode.clientWidth - 28);
+    cv.style.width = w + 'px'; cv.style.height = hCss + 'px'; cv.width = Math.round(w * dpr); cv.height = Math.round(hCss * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, hCss); return { g, w };
+  }
+  function tShown(R) { return tView == null ? R.tF : tView; }
+  function renderRoad(R) {
+    const t = tShown(R);
+    const H = Math.max(180, Math.min(420, 60 + R.P.length * 46));
+    const a = sizeCanvas($('road'), H); drawRoad(a.g, R, t, 0, 0, a.w, H, 1);
+    $('tNow').textContent = '第 ' + C.fmt(t, 1) + ' 秒 · ' + phaseAt(R, t);
+  }
+  function renderScrub(R) {
+    const s = $('t'); s.max = String(Math.ceil(tMax(R) * 2) / 2); s.value = String(tShown(R));
+    const J = [['到路口', 0], ['绿灯结束', R.tG], ['人行红灯亮', R.tF], ['车辆放行', R.tC]].filter((x) => !(x[0] === '绿灯结束' && Math.abs(x[1] - R.tF) < 1e-9) && !(x[0] === '车辆放行' && Math.abs(x[1] - R.tF) < 1e-9));
+    $('jump').innerHTML = J.map((x) => '<button class="ghost" data-t="' + x[1] + '">' + esc(x[0]) + ' ' + esc(C.fmt(x[1], 1)) + ' 秒</button>').join('');
+    [].forEach.call($('jump').querySelectorAll('button'), (b) => b.addEventListener('click', () => { tView = +b.dataset.t; if (Math.abs(tView - R.tF) < 1e-9) tView = null; $('t').value = String(tShown(R)); renderRoad(R); }));
+  }
+  function renderWho(R) {
+    $('who').innerHTML = '<tr><th>名字</th><th>步速</th><th>走完要</th><th>结果</th><th>红灯时还差</th><th class="hide-s">在第几道</th><th class="hide-s">最晚第几秒到</th></tr>' +
+      R.P.map((p) => '<tr><td>' + esc(p.name) + '</td><td>' + esc(C.fmt(p.v, 2)) + '</td><td>' + esc(C.sec(p.need)) + '</td><td><span class="tag ' + p.level + '">' + esc(C.LEVEL[p.level].label) + '</span></td><td>' + (p.left > 1e-9 ? esc(C.m(p.left)) : '已到') + '</td><td class="hide-s">' + (p.laneRed || '—') + '</td><td class="hide-s">' + (p.latest >= 0 ? esc(C.sec(C.latestShown(p))) : '来不及') + '</td></tr>').join('');
+  }
+  function sugList(sg) {
+    $('sugCard').style.display = sg.length ? '' : 'none';
+    $('sugs').innerHTML = sg.map((s, k) => '<div class="sug"><span>' + esc(s.text) + '</span><button class="ghost" data-sug="' + s.id + '" data-k="' + k + '">代回</button></div>').join('');
+    [].forEach.call($('sugs').querySelectorAll('button'), (b) => b.addEventListener('click', () => { state = copy(sg[+b.dataset.k].apply); fill(); tView = null; run(); }));
+  }
+
+  function run() {
+    KEYS.forEach((k) => $(k).classList.remove('bad'));
+    $('error').style.display = 'none';
+    try {
+      const R = C.calculate(state);
+      const sg = C.suggestions(state, R);
+      $('out').style.display = '';
+      $('stamp').textContent = R.stamp; $('stamp').className = 'stamp ' + R.verdict;
+      $('need').innerHTML = needText(R);
+      $('sumTxt').textContent = R.summary;
+      $('facts').innerHTML = R.facts.map((f) => '<li>' + esc(f) + '</li>').join('');
+      last = { r: R, sg };
+      if (tView != null && tView > tMax(R)) tView = null;
+      renderScrub(R); renderRoad(R); renderWho(R); sugList(sg);
+    } catch (e) {
+      last = null;
+      if (e.field) { const el = $(e.field); if (el) el.classList.add('bad'); }
+      $('error').textContent = '算不了：' + e.message; $('error').style.display = 'block';
+      $('out').style.display = 'none';
+    }
+    save();
+  }
+
+  /* ── 导出 ── */
+  function stamp() { const d = new Date(), z = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+  function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+  function wrap(g, t, w) {
+    const NOHEAD = '，。、；：！？）」』%·→｜';
+    const out = []; let line = [];
+    const toks = String(t).match(/[−-]?[0-9][0-9.,]*(\s?(米\/秒|米|秒|条|个))?|[A-Za-z_][A-Za-z0-9_.\-]*|[\s\S]/g) || [];
+    const width = (a) => g.measureText(a.join('')).width;
+    for (const tk of toks) {
+      if (line.length && width(line.concat([tk])) > w) {
+        let carry = [tk];
+        while (line.length > 1 && (NOHEAD.indexOf(carry[0][0]) >= 0 || '（「『'.indexOf(line[line.length - 1]) >= 0)) carry.unshift(line.pop());
+        out.push(line.join(''));
+        line = carry; if (/^\s+$/.test(line[0])) line.shift();
+      } else line.push(tk);
+    }
+    if (line.length) out.push(line.join('')); return out;
+  }
+  function drawPNG(Lx) {
+    const R = Lx.r, D = R.D;
+    const Wd = 1080, H = 1350, X = 64, TW = 952;
+    const cv = document.createElement('canvas'); cv.width = Wd; cv.height = H;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#eceff1'; g.fillRect(0, 0, Wd, H);
+    g.fillStyle = '#fdfefe'; g.fillRect(32, 32, Wd - 64, H - 64);
+    g.fillStyle = '#234e68'; g.fillRect(32, 32, Wd - 64, 10);
+    g.fillStyle = '#4f5a61'; g.font = '22px ' + FF;
+    g.fillText(fit(g, NAME + ' · 路宽 ' + C.m(D.width) + ' · ' + D.lanes + ' 条车道 · 绿灯 ' + C.sec(D.green) + (D.flash ? ' + 绿闪 ' + C.sec(D.flash) : ''), TW - 300), X, 92);
+    g.fillStyle = '#1f2529';
+    let hs = 40; g.font = 'bold ' + hs + 'px ' + FF;
+    while (hs > 26 && g.measureText(needPlain(R)).width > TW - 300) { hs -= 2; g.font = 'bold ' + hs + 'px ' + FF; }
+    g.fillText(fit(g, needPlain(R), TW - 300), X, 156);
+    g.save(); g.translate(X + TW - 130, 128); g.rotate(-0.06);
+    const col = { ok: '#2f7a4f', rush: '#b07a12', late: '#c4561d', stuck: '#b3412f' }[R.verdict];
+    g.strokeStyle = g.fillStyle = col; g.lineWidth = 4;
+    g.font = 'bold 28px ' + FF; const sw = Math.max(200, g.measureText(R.stamp).width + 40);
+    g.strokeRect(-sw / 2, -32, sw, 56); g.textAlign = 'center'; g.fillText(R.stamp, 0, 6); g.restore();
+    let y = 214;
+    g.fillStyle = '#1f2529'; g.font = 'bold 24px ' + FF;
+    let sl = wrap(g, R.summary, TW); if (sl.length > 3) { g.font = 'bold 21px ' + FF; sl = wrap(g, R.summary, TW); }
+    sl.slice(0, 4).forEach((l) => { g.fillText(l, X, y); y += 34; });
+    y += 6;
+    g.font = '19px ' + FF; g.fillStyle = '#4f5a61';
+    for (const f of R.facts) { const ls = wrap(g, '· ' + f, TW); if (y + ls.length * 27 > 640) break; ls.forEach((l) => { g.fillText(l, X, y); y += 27; }); y += 2; }
+    y += 14;
+    g.fillStyle = '#1f2529'; g.font = 'bold 20px ' + FF; g.fillText('人行红灯亮的那一刻（第 ' + C.fmt(R.tF, 1) + ' 秒）', X, y); y += 6;
+    const rh = Math.max(200, Math.min(380, 70 + R.P.length * 40));
+    drawRoad(g, R, R.tF, X, y, TW, rh, 1.4); y += rh + 30;
+    const rowsH = 30 + R.P.length * 28 + 14 + Lx.sg.reduce((a, sgi) => a + wrap(g, '· 改一样：' + sgi.text, TW).length * 27 + 3, 0);
+    if (R.tC > R.tF + 1e-9 && y + 40 + rh + 30 + rowsH < H - 110) {
+      g.fillStyle = '#1f2529'; g.font = 'bold 20px ' + FF; g.fillText('车辆放行的那一刻（第 ' + C.fmt(R.tC, 1) + ' 秒）', X, y); y += 6;
+      drawRoad(g, R, R.tC, X, y, TW, rh, 1.4); y += rh + 30;
+    }
+    g.font = 'bold 18px ' + FF; g.fillStyle = '#4f5a61';
+    const cols = [X, X + 420, X + 600, X + 800];
+    ['名字', '步速', '走完要', '红灯时还差'].forEach((t, i) => { g.textAlign = i ? 'right' : 'left'; g.fillText(t, i ? cols[i] + 120 : cols[0], y); });
+    y += 30; g.font = '19px ' + FF;
+    for (let i = 0; i < R.P.length; i++) {
+      const p = R.P[i];
+      if (y > H - 150 - (i < R.P.length - 1 ? 28 : 0)) { g.fillStyle = '#74808a'; g.textAlign = 'left'; g.fillText('……还有 ' + (R.P.length - i) + ' 人，见 CSV', X, y); y += 28; break; }
+      const vals = [fit(g, p.name, 380), C.mps(p.v), C.sec(p.need), p.left > 1e-9 ? C.m(p.left) : '已到'];
+      vals.forEach((t, i) => { g.textAlign = i ? 'right' : 'left'; g.fillStyle = i === 3 ? COL[p.level] : '#1f2529'; g.fillText(t, i ? cols[i] + 120 : cols[0], y); });
+      y += 28;
+    }
+    g.textAlign = 'left'; y += 14;
+    g.font = '19px ' + FF; g.fillStyle = '#1f2529';
+    for (const sgi of Lx.sg) {
+      const ls = wrap(g, '· 改一样：' + sgi.text, TW);
+      if (y + ls.length * 27 > H - 110) break;
+      ls.forEach((l) => { g.fillText(l, X, y); y += 27; }); y += 3;
+    }
+    g.fillStyle = '#74808a'; g.font = '18px ' + FF;
+    ['按匀速直线估算，步速和反应时间是自填的；不对应真实路口配时，不判断责任。', '默认例子是虚构的。车放行时还在路上，最稳的是在安全岛或路边等下一轮。'].forEach((l, i) => g.fillText(l, X, H - 76 + i * 27));
+    return Promise.resolve(cv);
+  }
+  function backup() {
+    const R = last.r;
+    return { app: NAME, version: 1, savedAt: stamp(), input: copy(state), result: { verdict: R.verdict, stamp: R.stamp, summary: R.summary, tRed: R.tF, minSpeed: isFinite(R.vmin) ? R.vmin : null, greenNeeded: R.gNeed,
+      people: R.P.map((p) => ({ name: p.name, speed: p.v, need: p.need, level: p.level, leftAtRed: p.left, laneAtRed: p.laneRed, latestArrive: p.latest >= 0 ? C.latestShown(p) : null })) } };
+  }
+  function init() {
+    let dt = null;
+    KEYS.forEach((k) => { const el = $(k); el.addEventListener('input', () => { state[k] = el.value; save(); clearTimeout(dt); dt = setTimeout(run, 120); }); });
+    PRESETS.forEach((p) => {
+      const b = document.createElement('button'); b.className = 'ghost'; b.textContent = p[0];
+      b.addEventListener('click', () => { state = copy(p[1]); fill(); tView = null; run(); });
+      $('presets').appendChild(b);
+    });
+    $('reset').addEventListener('click', () => { state = copy(DEFAULT); fill(); tView = null; run(); });
+    $('t').addEventListener('input', () => { if (!last) return; tView = +$('t').value; renderRoad(last.r); });
+    $('dlCSV').addEventListener('click', () => { if (last) download(NAME + '.csv', new Blob(['\ufeff' + C.toCSV(last.r, stamp())], { type: 'text/csv;charset=utf-8' })); });
+    $('dlMD').addEventListener('click', () => { if (last) download(NAME + '.md', new Blob([C.toMD(last.r, stamp(), last.sg)], { type: 'text/markdown;charset=utf-8' })); });
+    $('dlJSON').addEventListener('click', () => { if (last) download(NAME + '-备份.json', new Blob([JSON.stringify(backup(), null, 2)], { type: 'application/json' })); });
+    $('dlPNG').addEventListener('click', () => { if (last) drawPNG(last).then((cv) => cv.toBlob((b) => download(NAME + '-1080x1350.png', b), 'image/png')); });
+    let rt = null; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (last) renderRoad(last.r); }, 150); });
+    state = load() || copy(DEFAULT);
+    fill(); run();
+    window.__ex = { last: () => last, state: () => state, presets: PRESETS, DEFAULT, drawPNG, backup, needPlain, setT: (t) => { tView = t; if (last) { $('t').value = String(t); renderRoad(last.r); } } };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+  </script>
+</body>
+</html>
